@@ -117,7 +117,8 @@ Job Aggregator/
     ├── .python-version  — Python version for this project (3.13)
     ├── README.md
     └── src/job_agent/
-        └── __init__.py  — placeholder entry point (real code from 3b on)
+        ├── __init__.py  — placeholder entry point
+        └── ats.py       — ATS detector (Greenhouse/Lever/Ashby)
 ```
 
 ## Current status
@@ -125,10 +126,13 @@ Job Aggregator/
 - **Step 2 is done**: profile, rubric, setup, and resumes are in place.
 - **Step 3a is done**: `job_agent/` scaffolded as a `uv`-managed Python
   project (Python 3.13, `src/job_agent/` package layout).
+- **Step 3b is done**: ATS detector (`job_agent/src/job_agent/ats.py`) —
+  detects Greenhouse/Lever/Ashby from a known careers URL, or by guessing
+  a slug from a company name/domain and probing each ATS's public API.
 - **Open items**:
   - Confirm resume summaries.
   - Make must-haves specific (not generic).
-- **Next up**: Step 3b — ATS detector.
+- **Next up**: Step 3c — company watchlist.
 
 ---
 

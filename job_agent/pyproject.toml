@@ -7,7 +7,9 @@ authors = [
     { name = "Rootu Joshi", email = "4442296+rootuj@users.noreply.github.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "httpx>=0.28.1",
+]
 
 [project.scripts]
 job-agent = "job_agent:main"
