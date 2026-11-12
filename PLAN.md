@@ -118,7 +118,8 @@ Job Aggregator/
     ├── README.md
     └── src/job_agent/
         ├── __init__.py  — placeholder entry point
-        └── ats.py       — ATS detector (Greenhouse/Lever/Ashby)
+        ├── ats.py       — ATS detector (Greenhouse/Lever/Ashby)
+        └── watchlist.py — tracked companies (data/watchlist.json, gitignored)
 ```
 
 ## Current status
@@ -129,10 +130,14 @@ Job Aggregator/
 - **Step 3b is done**: ATS detector (`job_agent/src/job_agent/ats.py`) —
   detects Greenhouse/Lever/Ashby from a known careers URL, or by guessing
   a slug from a company name/domain and probing each ATS's public API.
+- **Step 3c is done**: company watchlist (`job_agent/src/job_agent/watchlist.py`)
+  — stores companies you add, tagged with their ATS via the detector.
+  Saved as JSON at `job_agent/data/watchlist.json` (gitignored — personal
+  data, not shared code).
 - **Open items**:
   - Confirm resume summaries.
   - Make must-haves specific (not generic).
-- **Next up**: Step 3c — company watchlist.
+- **Next up**: Step 3d — first MCP server.
 
 ---
 

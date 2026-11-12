@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 .venv/
 *.egg-info/
+
+# Personal data (watchlist, job history, etc.) — not shared code
+job_agent/data/
