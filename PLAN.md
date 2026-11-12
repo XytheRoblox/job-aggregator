@@ -58,10 +58,12 @@ guessed now):
 
 - **Two-step discovery**: a weekly **Company Finder** followed by a daily
   **Job Finder**.
-- **Sources, in order**: Greenhouse, Lever, and Ashby first; Workday later
-  (unofficial, since it has no public API); VC portfolio pages, HN Who's
-  Hiring, and YC for company discovery; LinkedIn last, as a private,
-  local-only, read-only plugin that runs once a day.
+- **Sources, in order**: Greenhouse, Lever, and Ashby first; Workday also
+  supported (detection added — its job API is real but unofficial:
+  undocumented, unversioned, and called with POST instead of GET like the
+  other three — fetching it lands at step 4 alongside the others); VC
+  portfolio pages, HN Who's Hiring, and YC for company discovery; LinkedIn
+  last, as a private, local-only, read-only plugin that runs once a day.
 - **Daily runs diff against the previous run**: jobs are marked new,
   unchanged, edited, or gone. A job is marked closed after 2 consecutive
   misses, and reposts are flagged.
@@ -129,8 +131,10 @@ Job Aggregator/
 - **Step 3a is done**: `job_agent/` scaffolded as a `uv`-managed Python
   project (Python 3.13, `src/job_agent/` package layout).
 - **Step 3b is done**: ATS detector (`job_agent/src/job_agent/ats.py`) —
-  detects Greenhouse/Lever/Ashby from a known careers URL, or by guessing
-  a slug from a company name/domain and probing each ATS's public API.
+  detects Greenhouse/Lever/Ashby/Workday from a known careers URL, or (for
+  Greenhouse/Lever/Ashby only — Workday's URL can't be guessed) by
+  guessing a slug from a company name/domain and probing each ATS's
+  public API. Verified live against a real Workday site (NVIDIA).
 - **Step 3c is done**: company watchlist (`job_agent/src/job_agent/watchlist.py`)
   — stores companies you add, tagged with their ATS via the detector.
   Saved as JSON at `job_agent/data/watchlist.json` (gitignored — personal
