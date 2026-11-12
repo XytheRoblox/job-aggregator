@@ -119,7 +119,8 @@ Job Aggregator/
     └── src/job_agent/
         ├── __init__.py  — placeholder entry point
         ├── ats.py       — ATS detector (Greenhouse/Lever/Ashby)
-        └── watchlist.py — tracked companies (data/watchlist.json, gitignored)
+        ├── watchlist.py — tracked companies (data/watchlist.json, gitignored)
+        └── mcp_server.py — MCP server exposing watchlist tools to Claude
 ```
 
 ## Current status
@@ -134,10 +135,16 @@ Job Aggregator/
   — stores companies you add, tagged with their ATS via the detector.
   Saved as JSON at `job_agent/data/watchlist.json` (gitignored — personal
   data, not shared code).
+- **Step 3d is done**: first MCP server (`job_agent/src/job_agent/mcp_server.py`),
+  exposing `watchlist_add` and `watchlist_list` as tools — add companies by
+  asking Claude instead of running Python. Run it with `uv run job-agent-mcp`.
+  (Note: the `mcp` package did a breaking v2 API change after this plan was
+  written — `FastMCP` is now `MCPServer`, imported from `mcp.server.mcpserver`.)
 - **Open items**:
   - Confirm resume summaries.
   - Make must-haves specific (not generic).
-- **Next up**: Step 3d — first MCP server.
+- **Next up**: Step 4 — Job Finder (Greenhouse/Lever/Ashby feeds, standard
+  job format, dedup, daily comparison).
 
 ---
 
