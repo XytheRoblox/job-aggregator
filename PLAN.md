@@ -23,6 +23,37 @@ themselves — this tool never applies on its own.
   double-click install.
 - **Never auto-submit applications, create accounts, or solve CAPTCHAs.**
 
+## Architecture
+
+This is a **pipeline**, not a live web app with a database — it runs as
+scheduled batch steps that write plain data files, and the dashboard just
+reads the latest files. Think of it as an assembly line: each stage reads
+what the previous stage produced and hands off a file to the next stage.
+
+1. **Company Finder** (weekly) → builds/updates a watchlist of companies
+   and which ATS each one uses.
+2. **Job Finder** (daily) → pulls raw postings from each watched company's
+   ATS feed, normalizes them into one standard job format, dedups, and
+   diffs against the previous run (new/unchanged/edited/gone).
+3. **Funnel** → cheap code filters first (location, keywords), then Fit
+   Quotient (still code — resume/JD keyword overlap), narrowing to the
+   top ~20 — only those go on to Job Score, where the model gets involved.
+4. **Dashboard** → a thin local web app that only *reads* the latest
+   output files and displays them; no pipeline logic lives there.
+5. **Scheduler** (step 7) → triggers the daily run automatically.
+
+**Where the model fits in**: `job_agent` will expose an **MCP server**
+(step 3d) — the structured doorway Claude uses to call into the engine's
+data and functions, instead of operating freeform. The model is only
+invoked for the two judgment calls (Job Score, application prep); fetching,
+filtering, and deduping stay pure deterministic code.
+
+**Not yet decided** (to be settled at the matching roadmap step, not
+guessed now):
+- Storage format for job data (flat JSON files vs. SQLite) — step 4.
+- Scheduler mechanism (macOS `launchd` vs. a simple loop) — step 7.
+- Exact shape of the MCP server's tools — step 3d.
+
 ## Key decisions
 
 - **Two-step discovery**: a weekly **Company Finder** followed by a daily
@@ -70,13 +101,34 @@ themselves — this tool never applies on its own.
 **Later / someday**: build-a-resume-with-me, warm-intro finder, easy
 double-click install, hosted version.
 
+## File structure
+
+Kept up to date as real folders/files are added (not every tiny file —
+just the shape of the project).
+
+```
+Job Aggregator/
+├── PLAN.md              — this file
+├── CLAUDE.local.md      — personal preferences (gitignored, not shared)
+├── .gitignore
+└── job_agent/           — the engine (step 3+), separate from the dashboard
+    ├── pyproject.toml   — project metadata + dependencies
+    ├── uv.lock          — exact locked dependency versions
+    ├── .python-version  — Python version for this project (3.13)
+    ├── README.md
+    └── src/job_agent/
+        └── __init__.py  — placeholder entry point (real code from 3b on)
+```
+
 ## Current status
 
 - **Step 2 is done**: profile, rubric, setup, and resumes are in place.
+- **Step 3a is done**: `job_agent/` scaffolded as a `uv`-managed Python
+  project (Python 3.13, `src/job_agent/` package layout).
 - **Open items**:
   - Confirm resume summaries.
   - Make must-haves specific (not generic).
-- **Next up**: Step 3a — Python project scaffolding with `uv`.
+- **Next up**: Step 3b — ATS detector.
 
 ---
 
