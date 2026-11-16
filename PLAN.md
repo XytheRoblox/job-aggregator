@@ -123,7 +123,8 @@ Job Aggregator/
         ├── ats.py       — ATS detector (Greenhouse/Lever/Ashby)
         ├── watchlist.py — tracked companies (data/watchlist.json, gitignored)
         ├── mcp_server.py — MCP server exposing watchlist tools to Claude
-        └── jobs.py      — standard Job format + fetchers (Greenhouse/Lever/Ashby/Workday)
+        ├── jobs.py      — standard Job format + fetchers (Greenhouse/Lever/Ashby/Workday)
+        └── tracking.py  — daily diff (new/unchanged/edited/gone/repost), data/jobs/*.json
 ```
 
 ## Current status
@@ -148,20 +149,28 @@ Job Aggregator/
 - **Open items**:
   - Confirm resume summaries.
   - Make must-haves specific (not generic).
-- **Step 4 is in progress**: Job Finder, slice 1 done — a standard `Job`
-  format plus fetchers for all four ATS types (`job_agent/src/job_agent/jobs.py`),
-  verified against real companies. Two real bugs found and fixed along
-  the way:
-  - Workday rejects `limit > 20` with a 400 (undocumented).
-  - Workday's `total` field is only correct on the *first* paginated
-    page — every later page reports `total: 0` even with real postings
-    still coming back. The fetcher now captures `total` once, from page
-    1, instead of re-reading it every page.
-  - Also hit Workday's Cloudflare-based rate limiting live while testing
-    a large company (NVIDIA, ~2000 jobs ≈ 100 requests); added pacing
-    (0.5s between pages) and one longer backoff-retry on a 429.
-  - Not yet built: dedup and daily comparison (new/unchanged/edited/gone)
-    — that's slice 2 of step 4, next up.
+- **Step 4 is done**: Job Finder.
+  - A standard `Job` format plus fetchers for all four ATS types
+    (`job_agent/src/job_agent/jobs.py`), verified against real companies.
+    Two real Workday bugs found and fixed: it rejects `limit > 20` with
+    a 400 (undocumented), and its `total` field is only correct on the
+    *first* paginated page — every later page reports `total: 0` even
+    with real postings still coming back, so the fetcher now captures
+    `total` once, from page 1. Also hit Workday's Cloudflare-based rate
+    limiting live while testing a large company (NVIDIA, ~2000 jobs ≈
+    100 requests); added pacing (0.5s between pages) and one longer
+    backoff-retry on a 429.
+  - Dedup (`dedup_jobs` in `jobs.py`) and daily comparison
+    (`job_agent/src/job_agent/tracking.py`) — each company's job state
+    is persisted at `job_agent/data/jobs/{company}.json` (gitignored)
+    and diffed on every run into new/unchanged/edited/gone/repost. A
+    job missing from a run isn't immediately "gone" — it quietly gets a
+    miss counter; only after 2 consecutive misses is it marked closed
+    and reported as "gone". A job reappearing (same external_id, or a
+    new id with the same title+location as a closed job) is flagged
+    "repost" instead of "new". Verified end-to-end with a simulated
+    4-run scenario covering every transition, plus a save/load
+    round-trip check.
 
 ---
 

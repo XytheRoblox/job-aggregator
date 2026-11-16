@@ -152,6 +152,19 @@ _FETCHERS = {
 }
 
 
+def dedup_jobs(jobs: list[Job]) -> list[Job]:
+    """Drop exact duplicate postings (same company + external_id), keeping the first."""
+    seen: set[tuple[str, str]] = set()
+    deduped = []
+    for job in jobs:
+        key = (job.company, job.external_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(job)
+    return deduped
+
+
 def fetch_jobs(company: Company, client: httpx.Client | None = None) -> list[Job]:
     """Fetch and normalize every open job for one watchlisted company."""
     fetcher = _FETCHERS.get(company.ats or "")
@@ -161,7 +174,7 @@ def fetch_jobs(company: Company, client: httpx.Client | None = None) -> list[Job
     owns_client = client is None
     client = client or httpx.Client()
     try:
-        return fetcher(company, client)
+        return dedup_jobs(fetcher(company, client))
     finally:
         if owns_client:
             client.close()
