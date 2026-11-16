@@ -3,6 +3,10 @@ unchanged, edited, or gone — and flag reposts.
 
 Persisted per company at job_agent/data/jobs/{company}.json so each run
 only has to diff against yesterday's snapshot, not re-derive history.
+
+age_days and repost_count double as an indirect "phantom job" signal: a
+listing open unusually long, or reposted several times, may be evergreen
+rather than an actively-filled role.
 """
 
 from __future__ import annotations
@@ -26,10 +30,11 @@ class TrackedJob:
     location: str | None
     department: str | None
     url: str
-    posted_at: str | None
+    posted_at: str | None  # the ATS's own claimed date — not always trustworthy, kept for reference only
     status: str  # "open" or "closed"
     misses: int
-    first_seen_at: str
+    repost_count: int
+    first_seen_at: str  # the very first time we ever saw this job (or its repost lineage) — never reset
     last_seen_at: str
 
 
@@ -37,6 +42,8 @@ class TrackedJob:
 class JobChange:
     job: Job
     change: str  # "new", "unchanged", "edited", "gone", or "repost"
+    repost_count: int
+    age_days: int  # days since first_seen_at — age in OUR tracking context, not the ATS's own posted_at
 
 
 def _safe_filename(company: str) -> str:
@@ -57,7 +64,9 @@ def save_state(company: str, state: dict[str, TrackedJob], jobs_dir: Path = DEFA
     path.write_text(json.dumps({eid: asdict(t) for eid, t in state.items()}, indent=2))
 
 
-def _tracked_from(job: Job, *, status: str, misses: int, first_seen_at: str, last_seen_at: str) -> TrackedJob:
+def _tracked_from(
+    job: Job, *, status: str, misses: int, repost_count: int, first_seen_at: str, last_seen_at: str
+) -> TrackedJob:
     return TrackedJob(
         ats=job.ats,
         title=job.title,
@@ -67,6 +76,7 @@ def _tracked_from(job: Job, *, status: str, misses: int, first_seen_at: str, las
         posted_at=job.posted_at,
         status=status,
         misses=misses,
+        repost_count=repost_count,
         first_seen_at=first_seen_at,
         last_seen_at=last_seen_at,
     )
@@ -74,6 +84,10 @@ def _tracked_from(job: Job, *, status: str, misses: int, first_seen_at: str, las
 
 def _fields_match(job: Job, tracked: TrackedJob) -> bool:
     return (job.title, job.location, job.department) == (tracked.title, tracked.location, tracked.department)
+
+
+def _age_days(first_seen_at: str, now: datetime) -> int:
+    return (now - datetime.fromisoformat(first_seen_at)).days
 
 
 def diff_jobs(
@@ -88,33 +102,48 @@ def diff_jobs(
     changes: every job fetched today, plus any previously-open job that
     just crossed the miss threshold and is now considered gone.
     """
-    now_str = (now or datetime.now(timezone.utc)).isoformat()
+    now_dt = now or datetime.now(timezone.utc)
+    now_str = now_dt.isoformat()
     fetched_by_id = {job.external_id: job for job in fetched_jobs}
     new_state: dict[str, TrackedJob] = dict(previous_state)
     changes: list[JobChange] = []
 
     # a job reappearing under a new external_id but the same title+location
     # at a company where we'd already marked the old id closed — that's a repost
-    closed_lookup = {(t.title, t.location) for t in previous_state.values() if t.status == "closed"}
+    closed_lookup = {(t.title, t.location): t for t in previous_state.values() if t.status == "closed"}
 
     for external_id, job in fetched_by_id.items():
         previous = previous_state.get(external_id)
 
         if previous is None:
-            change = "repost" if (job.title, job.location) in closed_lookup else "new"
-            new_state[external_id] = _tracked_from(job, status="open", misses=0, first_seen_at=now_str, last_seen_at=now_str)
+            closed_match = closed_lookup.get((job.title, job.location))
+            if closed_match is not None:
+                change = "repost"
+                repost_count = closed_match.repost_count + 1
+                first_seen_at = closed_match.first_seen_at
+            else:
+                change = "new"
+                repost_count = 0
+                first_seen_at = now_str
+            new_state[external_id] = _tracked_from(
+                job, status="open", misses=0, repost_count=repost_count,
+                first_seen_at=first_seen_at, last_seen_at=now_str,
+            )
         elif previous.status == "closed":
             # reappeared under the SAME external_id after being closed — also a repost
             change = "repost"
             new_state[external_id] = _tracked_from(
-                job, status="open", misses=0, first_seen_at=previous.first_seen_at, last_seen_at=now_str
+                job, status="open", misses=0, repost_count=previous.repost_count + 1,
+                first_seen_at=previous.first_seen_at, last_seen_at=now_str,
             )
         else:
             change = "unchanged" if _fields_match(job, previous) else "edited"
             new_state[external_id] = _tracked_from(
-                job, status="open", misses=0, first_seen_at=previous.first_seen_at, last_seen_at=now_str
+                job, status="open", misses=0, repost_count=previous.repost_count,
+                first_seen_at=previous.first_seen_at, last_seen_at=now_str,
             )
-        changes.append(JobChange(job=job, change=change))
+        tracked = new_state[external_id]
+        changes.append(JobChange(job=job, change=change, repost_count=tracked.repost_count, age_days=_age_days(tracked.first_seen_at, now_dt)))
 
     for external_id, previous in previous_state.items():
         if previous.status != "open" or external_id in fetched_by_id:
@@ -136,6 +165,8 @@ def diff_jobs(
             url=previous.url,
             posted_at=previous.posted_at,
         )
-        changes.append(JobChange(job=ghost_job, change="gone"))
+        changes.append(
+            JobChange(job=ghost_job, change="gone", repost_count=previous.repost_count, age_days=_age_days(previous.first_seen_at, now_dt))
+        )
 
     return new_state, changes

@@ -171,6 +171,13 @@ Job Aggregator/
     "repost" instead of "new". Verified end-to-end with a simulated
     4-run scenario covering every transition, plus a save/load
     round-trip check.
+  - Each job also carries a `repost_count` (how many times it's been
+    relisted) and `age_days` — days since we *first* saw this job,
+    counted from its original listing and never reset by a repost or a
+    closed gap in between. Together these double as an indirect
+    "phantom job" signal: a listing open unusually long, or reposted
+    several times, may be evergreen rather than an actively-filled role
+    — useful input for Job Score (step 5) later.
 
 ---
 
