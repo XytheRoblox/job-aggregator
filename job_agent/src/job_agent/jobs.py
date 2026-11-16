@@ -1,0 +1,167 @@
+"""Job Finder: pull open jobs from a watchlisted company's ATS feed and
+convert them into one standard format, whichever ATS they're on.
+
+Field shapes were verified against real companies (Stripe/Greenhouse,
+Palantir/Lever, Ramp/Ashby, NVIDIA/Workday) rather than assumed, since
+each ATS names things differently.
+"""
+
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass
+from urllib.parse import urlparse
+
+import httpx
+
+from job_agent.watchlist import Company
+
+
+@dataclass
+class Job:
+    external_id: str  # this job's unique id on its own ATS
+    company: str
+    ats: str
+    title: str
+    location: str | None
+    url: str
+    department: str | None = None
+    posted_at: str | None = None  # left as a raw string; formats differ per ATS
+
+
+def _fetch_greenhouse(company: Company, client: httpx.Client) -> list[Job]:
+    data = client.get(company.board_url, timeout=10.0).json()
+    jobs = []
+    for raw in data.get("jobs", []):
+        jobs.append(
+            Job(
+                external_id=str(raw["id"]),
+                company=company.name,
+                ats="greenhouse",
+                title=raw["title"],
+                location=(raw.get("location") or {}).get("name"),
+                url=raw["absolute_url"],
+                posted_at=raw.get("first_published"),
+            )
+        )
+    return jobs
+
+
+def _fetch_lever(company: Company, client: httpx.Client) -> list[Job]:
+    data = client.get(company.board_url, timeout=10.0).json()
+    jobs = []
+    for raw in data:
+        categories = raw.get("categories") or {}
+        jobs.append(
+            Job(
+                external_id=raw["id"],
+                company=company.name,
+                ats="lever",
+                title=raw["text"],
+                location=categories.get("location"),
+                department=categories.get("team"),
+                url=raw["hostedUrl"],
+                posted_at=str(raw.get("createdAt", "")) or None,
+            )
+        )
+    return jobs
+
+
+def _fetch_ashby(company: Company, client: httpx.Client) -> list[Job]:
+    data = client.get(company.board_url, timeout=10.0).json()
+    jobs = []
+    for raw in data.get("jobs", []):
+        jobs.append(
+            Job(
+                external_id=raw["id"],
+                company=company.name,
+                ats="ashby",
+                title=raw["title"].strip(),
+                location=raw.get("location"),
+                department=raw.get("department"),
+                url=raw.get("jobUrl", ""),
+                posted_at=raw.get("publishedAt"),
+            )
+        )
+    return jobs
+
+
+def _fetch_workday(company: Company, client: httpx.Client) -> list[Job]:
+    # company.slug is "{tenant}/{site}"; job URLs need the site name
+    # prefixed on the host, e.g. https://tenant.wd5.myworkdayjobs.com/SITE/job/...
+    _, site = company.slug.split("/", 1)
+    host = urlparse(company.board_url).netloc
+    base_url = f"https://{host}/{site}"
+
+    jobs = []
+    limit = 20  # Workday rejects anything higher than 20 with a 400 — found by testing, undocumented
+    offset = 0
+    total: int | None = None  # only reliable on the first page — later pages report 0, found by testing
+    while True:
+        body = {"limit": limit, "offset": offset, "appliedFacets": {}, "searchText": ""}
+        response = client.post(company.board_url, json=body, timeout=10.0)
+
+        if response.status_code == 429:
+            # Observed live against a large company (NVIDIA, ~2000 jobs = ~100
+            # paginated requests): Workday sits behind Cloudflare, and its rate
+            # limiter blocks for well over 10 seconds once tripped — a 3s retry
+            # wasn't enough in testing. One longer retry is given; a second
+            # failure means something is actually wrong, so it's raised loudly
+            # rather than retried forever.
+            time.sleep(15.0)
+            response = client.post(company.board_url, json=body, timeout=10.0)
+
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Workday API returned {response.status_code} for {company.name} "
+                f"(unofficial endpoint — it may have changed shape or rate-limited us): "
+                f"{response.text[:200]}"
+            )
+        data = response.json()
+        if total is None:
+            total = data.get("total", 0)
+        postings = data.get("jobPostings", [])
+        if not postings:
+            break
+        for raw in postings:
+            bullet_fields = raw.get("bulletFields") or []
+            external_id = bullet_fields[0] if bullet_fields else raw["externalPath"]
+            jobs.append(
+                Job(
+                    external_id=external_id,
+                    company=company.name,
+                    ats="workday",
+                    title=raw["title"],
+                    location=raw.get("locationsText"),
+                    url=base_url + raw["externalPath"],
+                    posted_at=raw.get("postedOn"),
+                )
+            )
+        offset += limit
+        if offset >= total:
+            break
+        time.sleep(0.5)  # space out requests so large companies don't trip the rate limit
+    return jobs
+
+
+_FETCHERS = {
+    "greenhouse": _fetch_greenhouse,
+    "lever": _fetch_lever,
+    "ashby": _fetch_ashby,
+    "workday": _fetch_workday,
+}
+
+
+def fetch_jobs(company: Company, client: httpx.Client | None = None) -> list[Job]:
+    """Fetch and normalize every open job for one watchlisted company."""
+    fetcher = _FETCHERS.get(company.ats or "")
+    if fetcher is None:
+        raise ValueError(f"No fetcher for ATS {company.ats!r} (company: {company.name})")
+
+    owns_client = client is None
+    client = client or httpx.Client()
+    try:
+        return fetcher(company, client)
+    finally:
+        if owns_client:
+            client.close()

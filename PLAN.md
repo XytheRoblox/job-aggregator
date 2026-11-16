@@ -122,7 +122,8 @@ Job Aggregator/
         ├── __init__.py  — placeholder entry point
         ├── ats.py       — ATS detector (Greenhouse/Lever/Ashby)
         ├── watchlist.py — tracked companies (data/watchlist.json, gitignored)
-        └── mcp_server.py — MCP server exposing watchlist tools to Claude
+        ├── mcp_server.py — MCP server exposing watchlist tools to Claude
+        └── jobs.py      — standard Job format + fetchers (Greenhouse/Lever/Ashby/Workday)
 ```
 
 ## Current status
@@ -147,8 +148,20 @@ Job Aggregator/
 - **Open items**:
   - Confirm resume summaries.
   - Make must-haves specific (not generic).
-- **Next up**: Step 4 — Job Finder (Greenhouse/Lever/Ashby feeds, standard
-  job format, dedup, daily comparison).
+- **Step 4 is in progress**: Job Finder, slice 1 done — a standard `Job`
+  format plus fetchers for all four ATS types (`job_agent/src/job_agent/jobs.py`),
+  verified against real companies. Two real bugs found and fixed along
+  the way:
+  - Workday rejects `limit > 20` with a 400 (undocumented).
+  - Workday's `total` field is only correct on the *first* paginated
+    page — every later page reports `total: 0` even with real postings
+    still coming back. The fetcher now captures `total` once, from page
+    1, instead of re-reading it every page.
+  - Also hit Workday's Cloudflare-based rate limiting live while testing
+    a large company (NVIDIA, ~2000 jobs ≈ 100 requests); added pacing
+    (0.5s between pages) and one longer backoff-retry on a 429.
+  - Not yet built: dedup and daily comparison (new/unchanged/edited/gone)
+    — that's slice 2 of step 4, next up.
 
 ---
 
