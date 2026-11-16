@@ -135,9 +135,17 @@ Job Aggregator/
         ├── mcp_server.py — MCP server exposing watchlist tools to Claude
         ├── jobs.py      — standard Job format + fetchers (Greenhouse/Lever/Ashby/Workday)
         └── tracking.py  — daily diff (new/unchanged/edited/gone/repost), data/jobs/*.json
+    └── tests/           — pytest suite (fakes.py stands in for the network)
 ```
 
 ## Current status
+
+- **Automated tests added**: `job_agent/tests/` (`pytest`, run with
+  `uv run pytest` from `job_agent/`) — 29 tests covering `ats.py`,
+  `watchlist.py`, `jobs.py` (all four fetchers, plus the Workday pagination
+  and rate-limit bugs as permanent regression tests), and `tracking.py`'s
+  full diff lifecycle. All network calls are faked (`tests/fakes.py`), so
+  the suite runs in about a second with no live API dependency.
 
 - **Step 2 is done, confirmed**: `profile.yaml`, `rubric.md`, and real
   resumes are now physically present in this project (`my-job-search/`,
