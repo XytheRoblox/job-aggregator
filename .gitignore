@@ -8,3 +8,13 @@ __pycache__/
 
 # Personal data (watchlist, job history, etc.) — not shared code
 job_agent/data/
+
+# Your personal profile and scoring rubric — keep private
+profile.yaml
+rubric.md
+
+# Your private job-search folder (resumes and other personal files) — keep private
+my-job-search/
+
+# Secret settings like API keys and passwords — never share these
+.env

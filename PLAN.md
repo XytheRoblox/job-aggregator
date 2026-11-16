@@ -46,7 +46,10 @@ what the previous stage produced and hands off a file to the next stage.
 (step 3d) — the structured doorway Claude uses to call into the engine's
 data and functions, instead of operating freeform. The model is only
 invoked for the two judgment calls (Job Score, application prep); fetching,
-filtering, and deduping stay pure deterministic code.
+filtering, and deduping stay pure deterministic code. **Job Score is not
+a Python function** — the model computes it itself by reading `rubric.md`
+and `profile.yaml` directly and following the rubric exactly (see
+`CLAUDE.md`), the same way it already did before this engine existed.
 
 **Not yet decided** (to be settled at the matching roadmap step, not
 guessed now):
@@ -111,8 +114,15 @@ just the shape of the project).
 ```
 Job Aggregator/
 ├── PLAN.md              — this file
+├── CLAUDE.md            — agent rules for this project (committed, shared)
 ├── CLAUDE.local.md      — personal preferences (gitignored, not shared)
 ├── .gitignore
+├── profile.yaml         — your real preferences (gitignored, private)
+├── profile.example.yaml — template version (committed)
+├── rubric.md            — your real Job Score rubric (gitignored, private)
+├── rubric.example.md    — template version (committed)
+├── setup_questions.md   — questions used to build profile.yaml
+├── my-job-search/       — resumes + known_resumes.txt (gitignored, private)
 └── job_agent/           — the engine (step 3+), separate from the dashboard
     ├── pyproject.toml   — project metadata + dependencies
     ├── uv.lock          — exact locked dependency versions
@@ -129,7 +139,20 @@ Job Aggregator/
 
 ## Current status
 
-- **Step 2 is done**: profile, rubric, setup, and resumes are in place.
+- **Step 2 is done, confirmed**: `profile.yaml`, `rubric.md`, and real
+  resumes are now physically present in this project (`my-job-search/`,
+  all gitignored). They previously lived in a separate, disconnected
+  repo (`~/code/job-agent/`, 10 commits) that was never merged with this
+  one — that repo also had its own `CLAUDE.md` with operational rules
+  this project hadn't seen yet (resume versioning with Markdown copies
+  and a `known_resumes.txt` registry, `work_mode` string format, honesty
+  and safety rules). That `CLAUDE.md` is now copied in here as the real
+  one; `~/code/job-agent/` is retired but left untouched on disk as a
+  backup, not deleted.
+  - **Not yet built**: the resume-copy-versioning system `CLAUDE.md`
+    describes (Markdown copies of PDF/Word resumes, staleness refresh,
+    `known_resumes.txt` tracking). This belongs with step 8
+    ("Fit Quotient and best-resume pick").
 - **Step 3a is done**: `job_agent/` scaffolded as a `uv`-managed Python
   project (Python 3.13, `src/job_agent/` package layout).
 - **Step 3b is done**: ATS detector (`job_agent/src/job_agent/ats.py`) —

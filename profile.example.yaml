@@ -1,0 +1,58 @@
+# Example profile for the job agent.
+# To use it: copy this file to profile.yaml, then replace the example values with your own.
+# profile.yaml is listed in .gitignore, so your real details stay private.
+
+# Your full name
+name: "Jane Doe"
+
+# Job titles you want to apply for
+target_titles:
+  - "Product Manager"
+  - "Senior Product Manager"
+
+# Seniority levels you're open to
+seniority_levels:
+  - "Mid"
+  - "Senior"
+
+# Industries or areas of work you want to focus on
+industries_or_lanes:
+  - "Fintech"
+  - "Developer Tools"
+
+# Where you'd like to work.
+locations:
+  # Your options, most preferred first. These only affect ranking:
+  # a job that matches an earlier entry gets more location points.
+  # A job that matches nothing here still appears, with 0 location points.
+  ranked:
+    - "Remote (US)"
+    - "Austin, TX (hybrid or on-site)"
+    - "Remote (non-US company, working from the US)"
+    - "Anywhere in the US (hybrid or on-site)"
+  # Situations you'd never consider. Only these hide jobs entirely.
+  # Keep this list short, since hidden jobs are never shown or scored.
+  exclude:
+    - "Hybrid or on-site outside the US"
+
+# true if you need an employer to sponsor your work visa.
+# When true, postings that say they don't sponsor visas get flagged.
+needs_visa_sponsorship: false
+
+# The lowest yearly salary you'll consider, in US dollars (numbers only, no $ or commas)
+comp_floor_usd: 120000
+
+# Things a job must offer for you to consider it
+must_haves:
+  - "Health insurance"
+  - "Clear path to promotion"
+
+# Things that rule a job out for you
+dealbreakers:
+  - "More than 50% travel"
+  - "Unpaid trial work"
+
+# Advanced setting: most users never need to change this.
+# The folder holding your resumes, relative to this project folder.
+# Setup fills in this default automatically.
+resumes_folder: "my-job-search/resumes/"
